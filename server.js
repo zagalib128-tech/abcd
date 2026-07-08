@@ -1,26 +1,37 @@
-// Add this to your server.js
-app.use((req, res, next) => {
-  req.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-  req.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8';
-  req.headers['Referer'] = 'https://www.fotmob.com/';
-  next();
-});
+const express = require("express");
+const { createProxyMiddleware } = require("http-proxy-middleware");
 
-// Try proxying to multiple FotMob endpoints
-const proxyTargets = [
-  'https://www.fotmob.com',
-  'https://api.fotmob.com',
-  'https://cdn.fotmob.com'
-];
+const app = express();
 
-// Or use dynamic routing
-app.use("/", createProxyMiddleware({
-    target: "https://www.fotmob.com",
+app.use("/", (req, res, next) => {
+  const target = req.query.url;
+
+  if (!target) {
+    return res.send(`
+      <h2>Proxy is running</h2>
+      <p>Use it like this:</p>
+      <code>/?url=https://www.example.com</code>
+    `);
+  }
+
+  createProxyMiddleware({
+    target,
     changeOrigin: true,
     ws: true,
     secure: true,
-    onProxyReq: (proxyReq) => {
-      proxyReq.setHeader('Host', 'www.fotmob.com');
-      proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    followRedirects: true,
+    xfwd: true,
+    cookieDomainRewrite: "",
+    onProxyReq(proxyReq) {
+      proxyReq.setHeader(
+        "User-Agent",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0 Safari/537.36"
+      );
     }
-}));
+  })(req, res, next);
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Proxy running on port ${port}`);
+});
