@@ -1,8 +1,26 @@
-const http = require("http");
-const httpProxy = require("http-proxy");
+// Add this to your server.js
+app.use((req, res, next) => {
+  req.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+  req.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8';
+  req.headers['Referer'] = 'https://www.fotmob.com/';
+  next();
+});
 
-const proxy = httpProxy.createProxyServer({});
+// Try proxying to multiple FotMob endpoints
+const proxyTargets = [
+  'https://www.fotmob.com',
+  'https://api.fotmob.com',
+  'https://cdn.fotmob.com'
+];
 
-http.createServer(function (req, res) {
-  proxy.web(req, res, { target: req.url });
-}).listen(process.env.PORT || 3000);
+// Or use dynamic routing
+app.use("/", createProxyMiddleware({
+    target: "https://www.fotmob.com",
+    changeOrigin: true,
+    ws: true,
+    secure: true,
+    onProxyReq: (proxyReq) => {
+      proxyReq.setHeader('Host', 'www.fotmob.com');
+      proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    }
+}));
