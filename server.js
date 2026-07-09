@@ -8,35 +8,82 @@ const app = express();
 
 // Images
 app.use("/images", createProxyMiddleware({
-    target: "https://images.fotmob.com",
-    changeOrigin: true,
-    secure: false,
+  target: "https://images.fotmob.com",
+  changeOrigin: true,
+  secure: false,
+  pathRewrite: {
+    "^/images": ""
+  }
+}));
 
-    pathRewrite: {
-        "^/images": ""
-    },
+// Pub
+app.use("/pub", createProxyMiddleware({
+  target: "https://pub.fotmob.com",
+  changeOrigin: true,
+  secure: false,
+  pathRewrite: {
+    "^/pub": ""
+  }
+}));
 
-    onProxyRes: responseInterceptor(async (buffer, proxyRes, req, res) => {
+// Main proxy
+app.use("/", createProxyMiddleware({
+  target: "https://www.fotmob.com",
+  changeOrigin: true,
+  secure: false,
+  ws: true,
+
+  selfHandleResponse: true,
+
+  onProxyReq(proxyReq) {
+    proxyReq.setHeader("Accept-Encoding", "identity");
+  },
+
+  onProxyRes: responseInterceptor(async (buffer, proxyRes) => {
 
     const type = proxyRes.headers["content-type"] || "";
 
     if (type.includes("text/html")) {
 
-        let body = buffer.toString("utf8");
+      let body = buffer.toString("utf8");
 
-        const inject = `
+      const inject = `
 <script>
 (function () {
 
     function rewrite() {
+
         document.querySelectorAll("img").forEach(img => {
+
             if (img.src.startsWith("https://images.fotmob.com")) {
                 img.src = img.src.replace(
                     "https://images.fotmob.com",
                     "/images"
                 );
             }
+
+            if (img.srcset) {
+                img.srcset = img.srcset.replace(
+                    /https:\\/\\/images\\.fotmob\\.com/g,
+                    "/images"
+                );
+            }
+
         });
+
+        document.querySelectorAll("*").forEach(el => {
+
+            const bg = getComputedStyle(el).backgroundImage;
+
+            if (bg && bg.includes("https://images.fotmob.com")) {
+                el.style.backgroundImage = bg.replace(
+                    /https:\\/\\/images\\.fotmob\\.com/g,
+                    "/images"
+                );
+            }
+
+        });
+
     }
 
     rewrite();
@@ -45,53 +92,14 @@ app.use("/images", createProxyMiddleware({
         childList:true,
         subtree:true,
         attributes:true,
-        attributeFilter:["src"]
+        attributeFilter:["src","srcset","style"]
     });
 
 })();
 </script>
 `;
 
-        body = body.replace("</head>", inject + "</head>");
-
-        return body;
-    }
-
-    return buffer;
-}));
-
-// Pub
-app.use("/pub", createProxyMiddleware({
-  target: "https://pub.fotmob.com",
-  changeOrigin: true,
-  secure: false,
-}));
-
-// Main proxy
-app.use("/", createProxyMiddleware({
-    target: "https://www.fotmob.com",
-    changeOrigin: true,
-    secure: false,
-    ws: true,
-
-    selfHandleResponse: true,
-
-    onProxyReq(proxyReq) {
-        proxyReq.setHeader("Accept-Encoding", "identity");
-    },
-
-    onProxyRes: responseInterceptor(async (buffer, proxyRes, req, res) => {
-
-    const type = proxyRes.headers["content-type"] || "";
-
-    // Only rewrite HTML
-    if (type.includes("text/html")) {
-
-      let body = buffer.toString("utf8");
-
-      body = body
-        .replace(/https:\/\/images\.fotmob\.com/g, "/images")
-        .replace(/https:\/\/pub\.fotmob\.com/g, "/pub");
+      body = body.replace("</head>", inject + "</head>");
 
       return body;
     }
