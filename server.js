@@ -1,55 +1,56 @@
 const express = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
-const harmon = require("harmon");
+const {
+  createProxyMiddleware,
+  responseInterceptor,
+} = require("http-proxy-middleware");
 
 const app = express();
 
-app.use(harmon([], [{
-    query: "html",
-    func: function (node) {
-        if (!node.createWriteStream) return;
-
-        let html = "";
-
-        const ws = node.createWriteStream();
-
-        ws._write = function (chunk, enc, next) {
-            html += chunk.toString();
-            next();
-        };
-
-        ws.on("finish", () => {
-            html = html
-                .replace(/https:\/\/images\.fotmob\.com/g, "/images")
-                .replace(/https:\/\/pub\.fotmob\.com/g, "/pub");
-
-            node.write(html);
-            node.end();
-        });
-    }
-}]));
-
+// Images
 app.use("/images", createProxyMiddleware({
-    target: "https://images.fotmob.com",
-    changeOrigin: true,
-    secure: false
+  target: "https://images.fotmob.com",
+  changeOrigin: true,
+  secure: false,
 }));
 
+// Pub
 app.use("/pub", createProxyMiddleware({
-    target: "https://pub.fotmob.com",
-    changeOrigin: true,
-    secure: false
+  target: "https://pub.fotmob.com",
+  changeOrigin: true,
+  secure: false,
 }));
 
+// Main proxy
 app.use("/", createProxyMiddleware({
-    target: "https://www.fotmob.com",
-    changeOrigin: true,
-    ws: true,
-    secure: false,
-    selfHandleResponse: false
+  target: "https://www.fotmob.com",
+  changeOrigin: true,
+  secure: false,
+  ws: true,
+
+  selfHandleResponse: true,
+
+  onProxyRes: responseInterceptor(async (buffer, proxyRes, req, res) => {
+
+    const type = proxyRes.headers["content-type"] || "";
+
+    // Only rewrite HTML
+    if (type.includes("text/html")) {
+
+      let body = buffer.toString("utf8");
+
+      body = body
+        .replace(/https:\/\/images\.fotmob\.com/g, "/images")
+        .replace(/https:\/\/pub\.fotmob\.com/g, "/pub");
+
+      return body;
+    }
+
+    return buffer;
+  }),
 }));
 
 const port = process.env.PORT || 3000;
+
 app.listen(port, () => {
-    console.log("Proxy running on port " + port);
+  console.log("Proxy running on port " + port);
 });
