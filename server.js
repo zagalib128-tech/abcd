@@ -32,14 +32,18 @@ app.use("/pub", createProxyMiddleware({
 
 // Main proxy
 app.use("/", createProxyMiddleware({
-  target: "https://www.fotmob.com",
-  changeOrigin: true,
-  secure: false,
-  ws: true,
+    target: "https://www.fotmob.com",
+    changeOrigin: true,
+    secure: false,
+    ws: true,
 
-  selfHandleResponse: true,
+    selfHandleResponse: true,
 
-  onProxyRes: responseInterceptor(async (buffer, proxyRes, req, res) => {
+    onProxyReq(proxyReq) {
+        proxyReq.setHeader("Accept-Encoding", "identity");
+    },
+
+    onProxyRes: responseInterceptor(async (buffer, proxyRes, req, res) => {
 
     const type = proxyRes.headers["content-type"] || "";
 
