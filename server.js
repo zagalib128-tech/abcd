@@ -8,9 +8,35 @@ const app = express();
 
 // Images
 app.use("/images", createProxyMiddleware({
-  target: "https://images.fotmob.com",
-  changeOrigin: true,
-  secure: false,
+    target: "https://images.fotmob.com",
+    changeOrigin: true,
+    secure: false,
+    ws: true,
+    xfwd: true,
+
+    pathRewrite: {
+        "^/images": ""
+    },
+
+    onProxyReq(proxyReq) {
+        proxyReq.setHeader("Host", "images.fotmob.com");
+        proxyReq.setHeader(
+            "Referer",
+            "https://www.fotmob.com/"
+        );
+        proxyReq.setHeader(
+            "Origin",
+            "https://www.fotmob.com"
+        );
+        proxyReq.setHeader(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/138 Safari/537.36"
+        );
+        proxyReq.setHeader(
+            "Accept",
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        );
+    }
 }));
 
 // Pub
