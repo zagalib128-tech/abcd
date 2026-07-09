@@ -16,11 +16,48 @@ app.use("/images", createProxyMiddleware({
         "^/images": ""
     },
 
-    onProxyRes(proxyRes) {
-        delete proxyRes.headers["access-control-allow-origin"];
-        proxyRes.headers["access-control-allow-origin"] = "*";
-        proxyRes.headers["cache-control"] = "public, max-age=86400";
+    onProxyRes: responseInterceptor(async (buffer, proxyRes, req, res) => {
+
+    const type = proxyRes.headers["content-type"] || "";
+
+    if (type.includes("text/html")) {
+
+        let body = buffer.toString("utf8");
+
+        const inject = `
+<script>
+(function () {
+
+    function rewrite() {
+        document.querySelectorAll("img").forEach(img => {
+            if (img.src.startsWith("https://images.fotmob.com")) {
+                img.src = img.src.replace(
+                    "https://images.fotmob.com",
+                    "/images"
+                );
+            }
+        });
     }
+
+    rewrite();
+
+    new MutationObserver(rewrite).observe(document.documentElement,{
+        childList:true,
+        subtree:true,
+        attributes:true,
+        attributeFilter:["src"]
+    });
+
+})();
+</script>
+`;
+
+        body = body.replace("</head>", inject + "</head>");
+
+        return body;
+    }
+
+    return buffer;
 }));
 
 // Pub
